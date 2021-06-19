@@ -7,10 +7,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
-
-	"hack-browser-data/log"
 )
 
 const Prefix = "[x]: "
@@ -30,6 +29,37 @@ func BookMarkType(a int64) string {
 	default:
 		return "folder"
 	}
+}
+
+// CopyFileToLocal copy file to local path
+func CopyFileToLocal(profilePath, filename string) error {
+	p, err := filepath.Glob(filepath.Join(profilePath, filename))
+	if err != nil {
+		return err
+	}
+	if len(p) <= 0 {
+		return fmt.Errorf("find file %s failed", filename)
+	} else {
+		src := p[0]
+		locals, _ := filepath.Glob("*")
+		for _, v := range locals {
+			if v == filename {
+				err := os.Remove(filename)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		sourceFile, err := ioutil.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(filename, sourceFile, 0777)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func TimeStampFormat(stamp int64) time.Time {
@@ -82,7 +112,7 @@ func MakeDir(dirName string) error {
 func Compress(exportDir string) error {
 	files, err := ioutil.ReadDir(exportDir)
 	if err != nil {
-		log.Error(err)
+		return err
 	}
 	var b = new(bytes.Buffer)
 	zw := zip.NewWriter(b)
@@ -101,7 +131,7 @@ func Compress(exportDir string) error {
 		}
 		err = os.Remove(fileName)
 		if err != nil {
-			log.Error(err)
+			return err
 		}
 	}
 	if err := zw.Close(); err != nil {

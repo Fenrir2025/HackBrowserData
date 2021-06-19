@@ -5,13 +5,14 @@ func ChromePass(key, encryptPass []byte) ([]byte, error) {
 		if len(key) == 0 {
 			return nil, errSecurityKeyIsEmpty
 		}
-		var chromeIV = []byte{32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32}
-		return aes128CBCDecrypt(key, chromeIV, encryptPass[3:])
+		var iv = []byte{32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32}
+		return aes128CBCDecrypt(key, iv, encryptPass[3:])
 	} else {
 		return nil, errDecryptFailed
 	}
 }
 
-func DPApi(data []byte) ([]byte, error) {
+// DPAPI TODO: ReplaceDPAPI
+func DPAPI(data []byte) ([]byte, error) {
 	return nil, nil
 }

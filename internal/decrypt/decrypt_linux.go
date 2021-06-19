@@ -12,6 +12,6 @@ func ChromePass(key, encryptPass []byte) ([]byte, error) {
 	}
 }
 
-func DPApi(data []byte) ([]byte, error) {
+func DPAPI(data []byte) ([]byte, error) {
 	return nil, nil
 }

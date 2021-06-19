@@ -10,15 +10,13 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"hack-browser-data/log"
-
 	"golang.org/x/crypto/pbkdf2"
 )
 
 var (
 	errSecurityKeyIsEmpty = errors.New("input [security find-generic-password -wa 'Chrome'] in terminal")
 	errPasswordIsEmpty    = errors.New("password is empty")
-	errDecryptFailed      = errors.New("decrypt failed, password is empty")
+	errDecryptFailed      = errors.New("decrypt encrypt value failed")
 	errDecodeASN1Failed   = errors.New("decode ASN1 data failed")
 )
 
@@ -44,7 +42,8 @@ func NewASN1PBE(b []byte) (pbe ASN1PBE, err error) {
 	return nil, errDecodeASN1Failed
 }
 
-/* NSS Struct
+// NssPBE Struct
+/*
 SEQUENCE (2 elem)
 	SEQUENCE (2 elem)
 		OBJECT IDENTIFIER
@@ -69,21 +68,11 @@ type NssSequenceB struct {
 }
 
 func (n NssPBE) Decrypt(globalSalt, masterPwd []byte) (key []byte, err error) {
-	// byte[] GLMP; // GlobalSalt + MasterPassword
-	// byte[] HP; // SHA1(GLMP)
-	// byte[] HPES; // HP + EntrySalt
-	// byte[] CHP; // SHA1(HPES)
-	// byte[] PES; // EntrySalt completed to 20 bytes by zero
-	// byte[] PESES; // PES + EntrySalt
-	// byte[] k1;
-	// byte[] tk;
-	// byte[] k2;
-	// byte[] k; // final value containing key and iv
 	glmp := append(globalSalt, masterPwd...)
 	hp := sha1.Sum(glmp)
 	s := append(hp[:], n.EntrySalt...)
 	chp := sha1.Sum(s)
-	pes := PaddingZero(n.EntrySalt, 20)
+	pes := paddingZero(n.EntrySalt, 20)
 	tk := hmac.New(sha1.New, chp[:])
 	tk.Write(pes)
 	pes = append(pes, n.EntrySalt...)
@@ -94,11 +83,11 @@ func (n NssPBE) Decrypt(globalSalt, masterPwd []byte) (key []byte, err error) {
 	k2.Write(tkPlus)
 	k := append(k1.Sum(nil), k2.Sum(nil)...)
 	iv := k[len(k)-8:]
-	log.Debug("get firefox pbe key and iv success")
 	return des3Decrypt(k[:24], iv, n.Encrypted)
 }
 
-/* META Struct
+// MetaPBE Struct
+/*
 SEQUENCE (2 elem)
 	SEQUENCE (2 elem)
     	OBJECT IDENTIFIER
@@ -158,6 +147,30 @@ func (m MetaPBE) Decrypt(globalSalt, masterPwd []byte) (key2 []byte, err error) 
 	return aes128CBCDecrypt(key, iv, m.Encrypted)
 }
 
+// LoginPBE Struct
+/*
+SEQUENCE (3 elem)
+	OCTET STRING (16 byte)
+	SEQUENCE (2 elem)
+		OBJECT IDENTIFIER
+		OCTET STRING (8 byte)
+	OCTET STRING (16 byte)
+*/
+type LoginPBE struct {
+	CipherText []byte
+	LoginSequence
+	Encrypted []byte
+}
+
+type LoginSequence struct {
+	asn1.ObjectIdentifier
+	IV []byte
+}
+
+func (l LoginPBE) Decrypt(globalSalt, masterPwd []byte) (key []byte, err error) {
+	return des3Decrypt(globalSalt, l.IV, l.Encrypted)
+}
+
 func aes128CBCDecrypt(key, iv, encryptPass []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -180,7 +193,6 @@ func PKCS5UnPadding(src []byte) []byte {
 func des3Decrypt(key, iv []byte, src []byte) ([]byte, error) {
 	block, err := des.NewTripleDESCipher(key)
 	if err != nil {
-		log.Error(err)
 		return nil, err
 	}
 	blockMode := cipher.NewCBCDecrypter(block, iv)
@@ -189,7 +201,7 @@ func des3Decrypt(key, iv []byte, src []byte) ([]byte, error) {
 	return sq, nil
 }
 
-func PaddingZero(s []byte, l int) []byte {
+func paddingZero(s []byte, l int) []byte {
 	h := l - len(s)
 	if h <= 0 {
 		return s
@@ -199,27 +211,4 @@ func PaddingZero(s []byte, l int) []byte {
 		}
 		return s
 	}
-}
-
-/* Login Struct
-SEQUENCE (3 elem)
-	OCTET STRING (16 byte)
-	SEQUENCE (2 elem)
-		OBJECT IDENTIFIER
-		OCTET STRING (8 byte)
-	OCTET STRING (16 byte)
-*/
-type LoginPBE struct {
-	CipherText []byte
-	LoginSequence
-	Encrypted []byte
-}
-
-type LoginSequence struct {
-	asn1.ObjectIdentifier
-	IV []byte
-}
-
-func (l LoginPBE) Decrypt(globalSalt, masterPwd []byte) (key []byte, err error) {
-	return des3Decrypt(globalSalt, l.IV, l.Encrypted)
 }

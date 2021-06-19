@@ -55,7 +55,7 @@ func (b *dataBlob) ToByteArray() []byte {
 }
 
 // chrome < 80 https://chromium.googlesource.com/chromium/src/+/76f496a7235c3432983421402951d73905c8be96/components/os_crypt/os_crypt_win.cc#82
-func DPApi(data []byte) ([]byte, error) {
+func DPAPI(data []byte) ([]byte, error) {
 	dllCrypt := syscall.NewLazyDLL("Crypt32.dll")
 	dllKernel := syscall.NewLazyDLL("Kernel32.dll")
 	procDecryptData := dllCrypt.NewProc("CryptUnprotectData")
